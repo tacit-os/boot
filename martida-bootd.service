@@ -1,0 +1,28 @@
+[Unit]
+Description=Martida boot splash
+Documentation=https://github.com/tacit-os/boot
+DefaultDependencies=no
+After=systemd-tmpfiles-setup-dev.service
+Before=basic.target shutdown.target
+Conflicts=shutdown.target
+# Only on entries that ask for a splash. book4-mic24.conf deliberately has no
+# `splash` on its command line, so it stays a provably splash-free recovery boot.
+ConditionKernelCommandLine=splash
+ConditionVirtualization=!container
+
+[Service]
+# Type=simple is load-bearing, not incidental: systemd considers the unit
+# started at exec, so sysinit.target is never delayed. Changing this to
+# notify/oneshot/forking would turn it into a boot hang of up to 50 seconds.
+Type=simple
+ExecStart=/usr/local/bin/martida-bootd
+Restart=no
+# Whatever way we die, the panel must not stay dark (backlight is 0 between our
+# backlight_off and the lock's first frame). The device and its saved value are globbed, not
+# named: this machine's is "backlight", another's is not.
+ExecStopPost=-/bin/sh -c 'for b in /sys/class/backlight/*/brightness; do [ "$(cat $b)" = 0 ] || continue; for s in /var/lib/systemd/backlight/*:backlight:"$(basename "$(dirname $b)")"; do [ -r "$s" ] && cat "$s" > $b && break; done; done; true'
+TimeoutStopSec=5
+OOMScoreAdjust=-500
+
+[Install]
+WantedBy=sysinit.target

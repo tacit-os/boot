@@ -1,0 +1,20 @@
+[Unit]
+Description=Martida shutdown splash
+DefaultDependencies=no
+After=getty@tty1.service display-manager.service
+Before=systemd-poweroff.service systemd-reboot.service systemd-halt.service systemd-kexec.service
+# Only on entries that ask for a splash, like the boot unit: book4-mic24.conf exists to show
+# what a boot and a shutdown really do, at both ends.
+ConditionKernelCommandLine=splash
+ConditionVirtualization=!container
+
+[Service]
+# Same daemon as the boot splash: the ground with the mark, held until the kernel goes.
+# No driver load, no backlight games: the panel is already up.
+Type=simple
+ExecStart=/usr/local/bin/martida-bootd --shutdown
+KillSignal=SIGTERM
+TimeoutStopSec=2
+
+[Install]
+WantedBy=poweroff.target reboot.target halt.target kexec.target

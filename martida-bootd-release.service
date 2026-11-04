@@ -1,0 +1,27 @@
+[Unit]
+Description=Hand the display from the Martida splash to the compositor
+After=martida-bootd.service systemd-user-sessions.service
+Before=sddm.service
+ConditionKernelCommandLine=splash
+
+[Service]
+# If the splash died between backlight-off and its first frame, the panel would stay dark:
+# restore the saved brightness before the display manager starts.
+ExecStartPre=-/bin/sh -c 'for b in /sys/class/backlight/*/brightness; do [ "$(cat $b)" = 0 ] || continue; for s in /var/lib/systemd/backlight/*:backlight:"$(basename "$(dirname $b)")"; do [ -r "$s" ] && cat "$s" > $b && break; done; done; true'
+# If the splash never loaded the display driver (crash before modprobe), load it now so the
+# display manager has a screen. A no-op when it is already loaded.
+ExecStartPre=-/sbin/modprobe msm
+# SIGUSR1: draw a settled final frame, drmDropMaster, then keep the fd open so
+# the CRTC goes on scanning that frame until the compositor's first commit.
+# The daemon exits by itself once a wayland socket exists.
+Type=oneshot
+ExecStart=-/usr/bin/systemctl kill --signal=SIGUSR1 martida-bootd.service
+# systemctl kill returns once the signal is QUEUED, not once the daemon has
+# acted on it. Without this the ordering barrier does not actually cover the
+# drop, and sddm can race us to drmSetMaster.
+ExecStartPost=-/usr/bin/sleep 0.3
+RemainAfterExit=yes
+TimeoutSec=20
+
+[Install]
+WantedBy=graphical.target
